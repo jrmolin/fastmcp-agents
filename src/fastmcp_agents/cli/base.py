@@ -63,7 +63,6 @@ class CliContext(BaseModel):
     augmented_server_model: AugmentedServerModel = Field(default_factory=AugmentedServerModel)
     pending_tool_calls: list[PendingToolCall] = Field(default_factory=list)
 
-
 @click.group()
 @click.option(
     "--transport",
@@ -302,13 +301,27 @@ def call_tool(
 
 @cli_base.command(name="shell")
 @click.pass_context
-def shell(ctx: click.Context):  # noqa: ARG001
+async def shell(ctx: click.Context):  # noqa: ARG001
     """
     Start a shell session with the server.
 
     NOTE: This feature is currently unimplemented. Contributions are welcome!
     """
-    raise ContributionsWelcomeError(feature="shell")
+
+    # we have the context object, so we can get the server settings
+    # we can also get the augmented server model
+    # we can also get the pending tool calls
+    # we can also get the mcp clients
+    # we can also get the agents
+    # we can also get the server
+    # we can also get the transport
+    # we can also get the log level
+    try:
+        from fastmcp_agents.cli.tui import TuiApp
+        app = TuiApp()
+        await app.run_async()
+    except ImportError:
+        raise ImportError("Failed to run the shell, because of a missing import")
 
 
 @cli_interface.command(name="wrap", context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
