@@ -6,6 +6,26 @@ Screen {
     &:inline {
         height: 50vh;
     }
+
+    Digits { width: auto;}
+
+    Placeholder { padding: 2; }
+    Grid { grid-rows: auto; height: auto; }
+    # Change the styles according to the breakpoint classes
+    &.-narrow {
+        Grid { grid-size: 1; }
+    }
+    &.-normal {
+        Grid { grid-size: 2; }
+    }
+    &.-wide {
+        Grid { grid-size: 4; }
+    }
+    &.-very-wide {
+        Grid { grid-size: 6; }
+    }
+
+
 }
 
 #tree-view {

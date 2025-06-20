@@ -50,103 +50,170 @@ See comments for details.
 
 from __future__ import annotations
 
+import os
+import yaml
+
+from pydantic import BaseModel, Field
+
 from textual.app import App, ComposeResult
-from textual.containers import Vertical, Container, VerticalScroll
+from textual.containers import Container, VerticalScroll
+from textual.geometry import clamp
+from textual.message import Message
 from textual.reactive import reactive, var
 from textual.widget import Widget
-from textual.widgets import Label, DirectoryTree, Footer, Header, Static
+from textual.widgets import Input, Label, Switch, Header, Markdown, TextArea, OptionList, Static
+from textual.widgets.option_list import Option
 
-import os
-import sys
+from typing import List, Dict
 
-from rich.syntax import Syntax
-from rich.traceback import Traceback
+from .loader import BUNDLED_DIR
+
+# use pydantic for this
+class Server(BaseModel):
+    """An instance of a server we are managing."""
+
+    name: str
+    arguments: dict[str, Any]
+    print_format: Literal["markdown", "text", "none"] = "text"
+    file: str | None = None
 
 
+RUNNING_SERVERS : Dict[str, List[Server]]= {}
 
-TEXT = """I must not fear.
-Fear is the mind-killer.
-Fear is the little-death that brings total obliteration.
-I will face my fear.
-I will permit it to pass over me and through me.
-And when it has gone past, I will turn the inner eye to see its path.
-Where the fear has gone there will be nothing. Only I will remain."""
+def load_yaml_file(file_path):
+    """
+    Loads a YAML file and returns its content as a Python dictionary.
+    """
+    try:
+        with open(file_path, 'r') as file:
+            data = yaml.safe_load(file)
+        return data
+    except FileNotFoundError:
+        print(f"Error: The file '{file_path}' was not found.")
+        return None
+    except yaml.YAMLError as e:
+        print(f"Error parsing YAML file: {e}")
+        return None
+    
 
+class ByteEditor(Widget):
+    DEFAULT_CSS = """
+    ByteEditor > Container {
+        height: 1fr;
+        align: center middle;
+    }
+    ByteEditor > Container.top {
+        background: $boost;
+    }
+    ByteEditor Input {
+        width: 16;
+    }
+    """
+
+    value : reactive[str] = reactive("")
+
+    def compose(self) -> ComposeResult:
+        with Container(classes="top"):
+            yield Label(f"bundled server", id="server-name")
+            with VerticalScroll():
+                yield Markdown("Readme", id="readme")
+
+    def watch_value(self, value: str) -> None:  
+        """When self.value changes, update switches."""
+
+        readme = ""
+
+        # read the readme
+        path = BUNDLED_DIR / "servers" / value / "README.md"
+        if path.exists():
+            with open(path, 'r') as f:
+                readme = f.read()
+        
+        # read the yaml
+        path = BUNDLED_DIR / "servers" / value / "server.yml"
+        
+        if path.exists:
+            obj = load_yaml_file(path)
+            # pull out agents
+            # pull out servers
+            # pull out tools
+            # introspect things
+            # have things be turned on or off
+            # query the current environment / set values
+
+
+        # set values
+        
+
+        self.query_one("#server-name", Label).update(f"{value}")
+        self.query_one("#readme", Markdown).update(readme)
+
+
+def get_bundled_list(p: str = "servers") -> List[str]:
+    root = BUNDLED_DIR / p
+    bundled = os.listdir(root)
+    result = []
+    for b in bundled:
+        if os.path.isdir(root / b):
+            if (root / b / "server.yml").exists():
+                result.append(b)
+    return result
+
+class Bundled(Widget):
+    def compose(self) -> ComposeResult:
+
+        bundled = get_bundled_list()
+        options = []
+        for f in bundled:
+            options.append(Option(f"{f}", id=f"option-{f}"))
+
+        yield OptionList(
+            *options
+        )
 
 class TuiApp(App):
-    """
-    Test app to show our sidebar.
-    """
 
-    """Textual code browser app."""
-
-    CSS_PATH = "tui.tcss"
     BINDINGS = [
         ("s", "toggle_sidebar", "Toggle Sidebar"),
         ("q", "quit", "Quit"),
     ]
 
+    # local variables
     show_sidebar = var(True)
-    path: reactive[str | None] = reactive(None)
 
+
+    CSS_PATH = "tui.tcss"
+
+
+    # watcher functions
     def watch_show_sidebar(self, show_sidebar: bool) -> None:
         """Set or unset visible class when reactive changes."""
         self.set_class(show_sidebar, "-visible")
 
 
-    def compose(self) -> ComposeResult:
-        """Compose our UI."""
-        path = os.getcwd()
-        yield Header()
-        with Container():
-            yield DirectoryTree(path, id="tree-view")
-            with VerticalScroll(id="code-view"):
-                yield Static(id="code", expand=True)
-        yield Footer()
-
-
-    def on_mount(self) -> None:
-        self.query_one(DirectoryTree).focus()
-
-        def theme_change(_signal) -> None:
-            """Force the syntax to use a different theme."""
-            self.watch_path(self.path)
-
-        self.theme_changed_signal.subscribe(self, theme_change)
-
-    def on_directory_tree_file_selected(
-        self, event: DirectoryTree.FileSelected
-    ) -> None:
-        """Called when the user click a file in the directory tree."""
-        event.stop()
-        self.path = str(event.path)
-
-    def watch_path(self, path: str | None) -> None:
-        """Called when path changes."""
-        code_view = self.query_one("#code", Static)
-        if path is None:
-            code_view.update("")
-            return
-        try:
-            syntax = Syntax.from_path(
-                path,
-                line_numbers=True,
-                word_wrap=False,
-                indent_guides=True,
-                theme="github-dark" if self.current_theme.dark else "github-light",
-            )
-        except Exception:
-            code_view.update(Traceback(theme="github-dark", width=None))
-            self.sub_title = "ERROR"
-        else:
-            code_view.update(syntax)
-            self.query_one("#code-view").scroll_home(animate=False)
-            self.sub_title = path
-
-
+    # automatic action functions
+    # binding functions
     def action_toggle_sidebar(self) -> None:
         """Toggle the sidebar visibility."""
         self.show_sidebar = not self.show_sidebar
+
+    # UI functions
+    def on_mount(self) -> None:
+        self.query_one(Bundled).focus()
+
+        def theme_change(_signal) -> None:
+            """Force the syntax to use a different theme."""
+            self.watch_server(self.server)
+
+        self.theme_changed_signal.subscribe(self, theme_change)
+
+    def on_option_list_option_selected(self, event : OptionList.OptionSelected) -> None:
+        self.query_one(ByteEditor).value = f"{event.option.prompt}"
+
+
+    def compose(self) -> ComposeResult:
+        yield ByteEditor()
+        yield Bundled(id="tree-view")
 
 
 if __name__ == "__main__":
