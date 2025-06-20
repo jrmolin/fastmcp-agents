@@ -41,6 +41,7 @@ dev = [
   "pytest-asyncio",
   "ruff",
   "pygithub>=2.6.1",
+  "textual",
 ]
 lint = [
   "ruff"

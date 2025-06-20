@@ -56,12 +56,12 @@ import yaml
 from pydantic import BaseModel, Field
 
 from textual.app import App, ComposeResult
-from textual.containers import Container, VerticalScroll
+from textual.containers import Container, VerticalScroll, Horizontal
 from textual.geometry import clamp
 from textual.message import Message
 from textual.reactive import reactive, var
 from textual.widget import Widget
-from textual.widgets import Input, Label, Switch, Header, Markdown, TextArea, OptionList, Static
+from textual.widgets import Input, Label, Switch, Header, Markdown, TextArea, OptionList, Static, Placeholder
 from textual.widgets.option_list import Option
 
 from typing import List, Dict
@@ -95,17 +95,38 @@ def load_yaml_file(file_path):
         print(f"Error parsing YAML file: {e}")
         return None
     
+class InspectionWindow(Widget):
+    def compose(self) -> ComposeResult:
+        with VerticalScroll():
+            yield Markdown("Readme", id="readme")
 
-class ByteEditor(Widget):
+class HistoryWindow(Widget):
+    def compose(self) -> ComposeResult:
+        yield Placeholder()
+
+class ServerNotificationsWindow(Widget):
+    def compose(self) -> ComposeResult:
+        yield Placeholder()
+
+class MainWindow(Widget):
     DEFAULT_CSS = """
-    ByteEditor > Container {
-        height: 1fr;
+    MainWindow > InspectionWindow {
+        height: 3fr;
         align: center middle;
     }
-    ByteEditor > Container.top {
+    MainWindow > InspectionWindow.top {
         background: $boost;
     }
-    ByteEditor Input {
+    MainWindow > Horizontal {
+        height: 1fr;
+    }
+    MainWindow > Horizontal > HistoryWindow {
+        width: 1fr;
+    }
+    MainWindow > Horizontal > ServerNotificationsWindow {
+        width: 1fr;
+    }
+    MainWindow Input {
         width: 16;
     }
     """
@@ -113,10 +134,10 @@ class ByteEditor(Widget):
     value : reactive[str] = reactive("")
 
     def compose(self) -> ComposeResult:
-        with Container(classes="top"):
-            yield Label(f"bundled server", id="server-name")
-            with VerticalScroll():
-                yield Markdown("Readme", id="readme")
+        yield InspectionWindow()
+        with Horizontal():
+            yield HistoryWindow()
+            yield ServerNotificationsWindow()
 
     def watch_value(self, value: str) -> None:  
         """When self.value changes, update switches."""
@@ -145,8 +166,7 @@ class ByteEditor(Widget):
         # set values
         
 
-        self.query_one("#server-name", Label).update(f"{value}")
-        self.query_one("#readme", Markdown).update(readme)
+        self.query_one(InspectionWindow).query_one("#readme", Markdown).update(readme)
 
 
 def get_bundled_list(p: str = "servers") -> List[str]:
@@ -208,11 +228,11 @@ class TuiApp(App):
         self.theme_changed_signal.subscribe(self, theme_change)
 
     def on_option_list_option_selected(self, event : OptionList.OptionSelected) -> None:
-        self.query_one(ByteEditor).value = f"{event.option.prompt}"
+        self.query_one(MainWindow).value = f"{event.option.prompt}"
 
 
     def compose(self) -> ComposeResult:
-        yield ByteEditor()
+        yield MainWindow()
         yield Bundled(id="tree-view")
 
 
