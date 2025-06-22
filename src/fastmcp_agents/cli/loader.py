@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from urllib.parse import ParseResult, urlparse
+from typing import List
 
 import requests
 import yaml
@@ -93,6 +94,19 @@ def get_server_or_flow_dir(server_or_flow_name: str) -> Path:
         msg = f"Server or flow directory {server_or_flow_dir} not found"
         raise FileNotFoundError(msg)
     return server_or_flow_dir
+
+
+def get_list_of_bundled_servers() -> List[str]:
+    """Return a list of bundled servers with a valid configuration."""
+    root = SERVER_DIR
+    result = []
+
+    # make sure there is a server.yml file in there
+    for b in root.iterdir():
+        if b.is_dir():
+            if ( b / "server.yml").exists():
+                result.append(b.name)
+    return result
 
 
 def get_config_for_bundled(config_bundled: str) -> AugmentedServerModel:

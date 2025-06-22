@@ -308,6 +308,8 @@ async def shell(ctx: click.Context):  # noqa: ARG001
     NOTE: This feature is currently unimplemented. Contributions are welcome!
     """
 
+    cli_context = ctx.obj
+
     # we have the context object, so we can get the server settings
     # we can also get the augmented server model
     # we can also get the pending tool calls
@@ -318,7 +320,7 @@ async def shell(ctx: click.Context):  # noqa: ARG001
     # we can also get the log level
     try:
         from fastmcp_agents.cli.tui import TuiApp
-        app = TuiApp()
+        app = TuiApp(cliContext = cli_context)
         await app.run_async()
     except ImportError:
         raise ImportError("Failed to run the shell, because of a missing import")
