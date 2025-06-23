@@ -70,6 +70,7 @@ from textual.widgets import (
     Label, Markdown, OptionList, Static, Placeholder,
     ContentSwitcher, Button, DataTable,
     ListItem, ListView,
+    Collapsible
 )
 from textual.widgets.option_list import Option
 
@@ -93,16 +94,65 @@ class InspectionWindow(Widget):
     """Maybe this should start with all the available bundled servers.
     """
 
+    server_info: reactive[Server | None] = reactive(None, recompose=True)
+
     def update(self, server: Server) -> None:
         logging.info(f"got a value: {server}")
+        self.server_info = server
+        self.mutate_reactive(InspectionWindow.server_info)
 
-        # put the readme in readme?
-        # put the agents?
-        if server.readme is not None:
-            self.query_one(Markdown).update(server.readme)
-        else:
-            logging.info("got a none readme")
-    
+    def compose(self) -> ComposeResult:
+
+        initial = "data-table"
+        if self.server_info is not None:
+            initial = "server-info"
+
+        tabs = [
+                ("DataTable", "data-table"),
+                ("Markdown", "markdown"),
+                ("Server Info", "server-info")
+                ]
+        with Horizontal(id="buttons"):
+            for row in tabs:
+                yield Button(row[0], id=row[1])
+
+        with ContentSwitcher(initial=initial):
+            yield DataTable(id=tabs[0][1])
+
+            with VerticalScroll(id=tabs[1][1]):
+                md = "No README found"
+                if self.server_info is not None and self.server_info.readme is not None:
+                    md = self.server_info.readme
+                yield Markdown(md)
+
+            with VerticalScroll(id=tabs[2][1]):
+
+                if self.server_info is not None:
+                    model = self.server_info.augmented_server_model
+                    agents = model.agents
+                    mcp_servers = model.mcpServers
+                    tools = model.tools
+
+                    if tools:
+                        yield Label("Tools")
+                        yield ListView(
+                            *[ListItem(Label(t.name)) for t in tools]
+                        )
+
+                    if agents:
+                        yield Label("Agents")
+                        yield ListView(
+                            *[ListItem(Label(a.name)) for a in agents]
+                        )
+
+                    if mcp_servers:
+                        yield Label("MCP Servers")
+                        yield ListView(
+                            *[ListItem(Label(k)) for k in mcp_servers.keys()]
+                        )
+                else:
+                    yield Placeholder()
+
         # table = self.query_one(DataTable)
         # agents = ",".join([x["name"] for x in obj.get("agents", [])])
         # table.add_rows(
@@ -111,27 +161,9 @@ class InspectionWindow(Widget):
         #     ]
         # )
 
-    def compose(self) -> ComposeResult:
-
-        with Horizontal(id="buttons"):  
-            yield Button("DataTable", id="data-table")  
-            yield Button("Markdown", id="markdown")  
-
-        with ContentSwitcher(initial="data-table"):
-            yield DataTable(id="data-table")
-
-            with VerticalScroll(id="markdown"):
-                yield Markdown()
-
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.query_one(ContentSwitcher).current = event.button.id  
 
-    def on_mount(self) -> None:
-        table = self.query_one(DataTable)
-        table.add_columns("server", "agents")
-
-        readme = self.query_one(Markdown)
-        readme.update("readme here")
 
 
 class HistoryWindow(Widget):
