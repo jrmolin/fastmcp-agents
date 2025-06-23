@@ -60,21 +60,14 @@ logging.basicConfig(
 
 from rich.markdown import Markdown as RichMarkdown
 
-import os
-import yaml
+from pydantic import BaseModel
 
-import pathlib
-from pydantic import BaseModel, Field
-
-from textual import log
 from textual.app import App, ComposeResult
-from textual.containers import Container, VerticalScroll, Horizontal, Center
-from textual.geometry import clamp
-from textual.message import Message
+from textual.containers import VerticalScroll, Horizontal, Center
 from textual.reactive import reactive, var
 from textual.widget import Widget
 from textual.widgets import (
-    Input, Label, Switch, Header, Markdown, TextArea, OptionList, Static, Placeholder,
+    Label, Markdown, OptionList, Static, Placeholder,
     ContentSwitcher, Button, DataTable,
     ListItem, ListView,
 )
@@ -82,9 +75,9 @@ from textual.widgets.option_list import Option
 
 from typing import List, Dict, Optional
 
-from .models import AugmentedServerModel
-from .loader import get_config_for_bundled, get_list_of_bundled_servers, get_server_readme
-from .base import CliContext
+from fastmcp_agents.cli.models import AugmentedServerModel
+from fastmcp_agents.cli.loader import get_config_for_bundled, get_list_of_bundled_servers, get_server_readme
+from fastmcp_agents.cli.base import CliContext
 
 # use pydantic for this
 class Server(BaseModel):
@@ -96,22 +89,6 @@ class Server(BaseModel):
 
 RUNNING_SERVERS : Dict[str, List[Server]]= {}
 
-def load_yaml_file(file_path):
-    """
-    Loads a YAML file and returns its content as a Python dictionary.
-    """
-    try:
-        with open(file_path, 'r') as file:
-            data = yaml.safe_load(file)
-        return data
-    except FileNotFoundError:
-        print(f"Error: The file '{file_path}' was not found.")
-        return None
-    except yaml.YAMLError as e:
-        print(f"Error parsing YAML file: {e}")
-        return None
-    
-
 class InspectionWindow(Widget):
     """Maybe this should start with all the available bundled servers.
     """
@@ -122,7 +99,7 @@ class InspectionWindow(Widget):
         # put the readme in readme?
         # put the agents?
         if server.readme is not None:
-            self.query_one(Markdown).update(RichMarkdown(server.readme))
+            self.query_one(Markdown).update(server.readme)
         else:
             logging.info("got a none readme")
     
@@ -333,7 +310,3 @@ class TuiApp(App):
         yield MainWindow()
         yield Bundled(id="tree-view")
 
-
-if __name__ == "__main__":
-    app = TuiApp()
-    app.run()
