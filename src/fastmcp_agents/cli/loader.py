@@ -71,7 +71,7 @@ def get_config_from_file(file: str, directory: str | None = None) -> AugmentedSe
 
 def get_server_dir(server_name: str) -> Path:
     """Get the directory for a bundled server."""
-    server_dir = BUNDLED_DIR / server_name
+    server_dir = SERVER_DIR / server_name
     if not server_dir.exists():
         msg = f"Server directory {server_dir} not found"
         raise FileNotFoundError(msg)

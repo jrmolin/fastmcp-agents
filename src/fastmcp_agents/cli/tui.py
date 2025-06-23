@@ -50,6 +50,16 @@ See comments for details.
 
 from __future__ import annotations
 
+import logging
+from textual.logging import TextualHandler
+
+logging.basicConfig(
+    level="DEBUG",
+    handlers=[TextualHandler()],
+)
+
+from rich.markdown import Markdown as RichMarkdown
+
 import os
 import yaml
 
@@ -70,10 +80,10 @@ from textual.widgets import (
 )
 from textual.widgets.option_list import Option
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from .models import AugmentedServerModel
-from .loader import get_config_for_bundled, get_list_of_bundled_servers
+from .loader import get_config_for_bundled, get_list_of_bundled_servers, get_server_readme
 from .base import CliContext
 
 # use pydantic for this
@@ -81,6 +91,7 @@ class Server(BaseModel):
     """An instance of a server we are managing."""
     name: str
     augmented_server_model: AugmentedServerModel
+    readme: Optional[str] = None
 
 
 RUNNING_SERVERS : Dict[str, List[Server]]= {}
@@ -104,19 +115,16 @@ def load_yaml_file(file_path):
 class InspectionWindow(Widget):
     """Maybe this should start with all the available bundled servers.
     """
-    value : reactive(str) = reactive("")
 
-    def update(self, value) -> None:
-        self.value = value
+    def update(self, server: Server) -> None:
+        logging.info(f"got a value: {server}")
 
-
-    def watch_value(self, server: str) -> None:
-
-        log(f"got a value in watch_value: {server}")
-        # md = self.readme
-        # md.load(path)
-        # md.loading = False
-
+        # put the readme in readme?
+        # put the agents?
+        if server.readme is not None:
+            self.query_one(Markdown).update(RichMarkdown(server.readme))
+        else:
+            logging.info("got a none readme")
     
         # table = self.query_one(DataTable)
         # agents = ",".join([x["name"] for x in obj.get("agents", [])])
@@ -146,7 +154,6 @@ class InspectionWindow(Widget):
         table.add_columns("server", "agents")
 
         readme = self.query_one(Markdown)
-        readme.loading = True
         readme.update("readme here")
 
 
@@ -207,20 +214,18 @@ class MainWindow(Widget):
     }
     """
 
-    value : reactive[str] = reactive("")
+    def update(self, server: Server) -> None:
+        """When server is set, replace loading screen"""
+        logging.info(f"got a server update: {server}")
+
+        self.query_one(InspectionWindow).update(server)
+        self.query_one(HistoryWindow).append(server.name)
 
     def compose(self) -> ComposeResult:
-        self.inspection = InspectionWindow()
-        yield self.inspection
+        yield InspectionWindow()
         with Horizontal():
             yield HistoryWindow()
             yield ServerNotificationsWindow()
-
-    def watch_value(self, value: str) -> None:  
-        """When self.value changes, update switches."""
-
-        self.query_one(HistoryWindow).append(value)
-        self.inspection.update(value)
 
 
 class Bundled(Widget):
@@ -278,17 +283,14 @@ class TuiApp(App):
 
         self.theme_changed_signal.subscribe(self, theme_change)
 
-    async def on_option_list_option_selected(self, event : OptionList.OptionSelected) -> None:
+    def on_option_list_option_selected(self, event : OptionList.OptionSelected) -> None:
         # event.stop()
         value = event.option.prompt
-        self.query_one(MainWindow).value = value
+        
+        server = self.get_server(value)
+        self.query_one(MainWindow).update(server)
 
-
-        self.log(f"watching selected bundle: {value}")
-        server = await self.get_server(value)
-
-    async def get_server(self, value: str) -> Server:
-
+    def get_server(self, value: str) -> Server:
         # look for value in our history
         for h in self.history:
             if h.name == value:
@@ -298,6 +300,7 @@ class TuiApp(App):
         # Didn't find it, so create one
         try:
             augmented_server_model = get_config_for_bundled(value)
+            readme = get_server_readme(value)
 
             # agents, mcp_clients, server = await augmented_server_model.to_fastmcp_server(
             #     server_settings=self.cli_ctx.server_settings)
@@ -311,11 +314,12 @@ class TuiApp(App):
             #     transport=s.transport,
             # )
 
-            server = Server(name=value, augmented_server_model=augmented_server_model)
+            server = Server(name=value, augmented_server_model=augmented_server_model, readme=readme)
             self.history.append(server)
             return server
 
         except FileNotFoundError as f:
+            self.log(f"failed to find file: {f}")
             return None
         except Exception as e:
             self.log(f"Error raised: {e}")
